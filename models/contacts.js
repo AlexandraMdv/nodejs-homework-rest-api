@@ -1,66 +1,28 @@
-const fs = require("fs/promises");
-const path = require("path");
-const { randomBytes } = require("crypto"); // For generating unique IDs
+// This file defines a Mongoose schema and model for a contact in a MongoDB database.
 
-const contactsPath = path.join(__dirname, "contacts.json");
+const mongoose = require("mongoose");
+const Schema = mongoose.Schema;
 
-// Generate a unique 21-character ID for each contact
-const generateId = () => {
-  return randomBytes(16)
-    .toString("base64")
-    .replace(/\+/g, "")
-    .replace(/\//g, "")
-    .replace(/=/g, "")
-    .slice(0, 21);
-};
+const contactSchema = new Schema(
+  {
+    name: {
+      type: String,
+      required: [true, "Set name for contact"],
+    },
+    email: {
+      type: String,
+    },
+    phone: {
+      type: String,
+    },
+    favorite: {
+      type: Boolean,
+      default: false,
+    },
+  },
+  { versionKey: false, timestamps: true }
+);
 
-const listContacts = async () => {
-  const data = await fs.readFile(contactsPath);
-  return JSON.parse(data);
-};
+const Contact = mongoose.model("contact", contactSchema);
 
-const getContactById = async (contactId) => {
-  const contacts = await listContacts();
-  return contacts.find((contact) => contact.id === contactId) || null;
-};
-
-const removeContact = async (contactId) => {
-  const contacts = await listContacts();
-  const index = contacts.findIndex((contact) => contact.id === contactId);
-  if (index === -1) {
-    return null;
-  }
-  const [result] = contacts.splice(index, 1);
-  await fs.writeFile(contactsPath, JSON.stringify(contacts, null, 2));
-  return result;
-};
-
-const addContact = async (body) => {
-  const contacts = await listContacts();
-  const newContact = {
-    id: generateId(),
-    ...body,
-  };
-  contacts.push(newContact);
-  await fs.writeFile(contactsPath, JSON.stringify(contacts, null, 2));
-  return newContact;
-};
-
-const updateContact = async (contactId, body) => {
-  const contacts = await listContacts();
-  const index = contacts.findIndex((contact) => contact.id === contactId);
-  if (index === -1) {
-    return null;
-  }
-  contacts[index] = { ...contacts[index], ...body };
-  await fs.writeFile(contactsPath, JSON.stringify(contacts, null, 2));
-  return contacts[index];
-};
-
-module.exports = {
-  listContacts,
-  getContactById,
-  removeContact,
-  addContact,
-  updateContact,
-};
+module.exports = Contact;
