@@ -10,6 +10,7 @@ const {
 
 const router = express.Router();
 
+// homework 2
 // joi validation schemas
 const contactSchema = joi.object({
   name: joi.string().required(),
