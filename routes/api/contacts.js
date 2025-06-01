@@ -1,46 +1,38 @@
 const express = require("express");
-const joi = require("joi");
+const router = express.Router();
+const auth = require("../../middlewares/auth");
+
 const {
   listContacts,
   getContactById,
-  removeContact,
   addContact,
+  removeContact,
   updateContact,
-} = require("../../models/contactsService");
+  updateStatusContact,
+} = require("../../models/contactsService.js");
 
-const router = express.Router();
-
-// homework 2
-// joi validation schemas
-const contactSchema = joi.object({
-  name: joi.string().required(),
-  email: joi.string().email().required(),
-  phone: joi.string().required(),
-});
-
-const updateSchema = joi
-  .object({
-    name: joi.string(),
-    email: joi.string().email(),
-    phone: joi.string(),
-  })
-  .min(1);
-
-router.get("/", async (req, res, next) => {
+// GET /api/contacts
+router.get("/", auth, async (req, res, next) => {
   try {
-    const contacts = await listContacts();
-    console.log("Contacts from database:", contacts);
+    const { page = 1, limit = 10, favorite } = req.query;
+    const skip = (page - 1) * limit;
+    const filter = { owner: req.user._id };
 
+    if (favorite !== undefined) {
+      filter.favorite = favorite === "true";
+    }
+
+    const contacts = await listContacts(filter, skip, limit);
     res.json(contacts);
   } catch (error) {
     next(error);
   }
 });
 
-router.get("/:contactId", async (req, res, next) => {
+// GET /api/contacts/:contactId
+router.get("/:contactId", auth, async (req, res, next) => {
   try {
-    const { contactId } = req.params;
-    const contact = await getContactById(contactId);
+    const contact = await getContactById(req.params.contactId, req.user._id);
     if (!contact) {
       return res.status(404).json({ message: "Not found" });
     }
@@ -50,43 +42,40 @@ router.get("/:contactId", async (req, res, next) => {
   }
 });
 
-router.post("/", async (req, res, next) => {
+// POST /api/contacts
+router.post("/", auth, async (req, res, next) => {
   try {
-    const { error } = contactSchema.validate(req.body);
-    if (error) {
-      const missingField = error.details[0].context.key;
-      return res
-        .status(400)
-        .json({ message: `missing required ${missingField} field` });
-    }
-
-    const newContact = await addContact(req.body);
+    const newContact = await addContact({
+      ...req.body,
+      owner: req.user._id,
+    });
     res.status(201).json(newContact);
   } catch (error) {
     next(error);
   }
 });
 
-router.delete("/:contactId", async (req, res, next) => {
+// DELETE /api/contacts/:contactId
+router.delete("/:contactId", auth, async (req, res, next) => {
   try {
-    const result = await removeContact(req.params.contactId);
-    if (!result) {
+    const contact = await removeContact(req.params.contactId, req.user._id);
+    if (!contact) {
       return res.status(404).json({ message: "Not found" });
     }
-    res.json({ message: "contact deleted" });
+    res.json({ message: "Contact deleted" });
   } catch (error) {
     next(error);
   }
 });
 
-router.put("/:contactId", async (req, res, next) => {
+// PUT /api/contacts/:contactId
+router.put("/:contactId", auth, async (req, res, next) => {
   try {
-    const { error } = updateSchema.validate(req.body);
-    if (error) {
-      return res.status(400).json({ message: "missing fields" });
-    }
-
-    const updatedContact = await updateContact(req.params.contactId, req.body);
+    const updatedContact = await updateContact(
+      req.params.contactId,
+      req.body,
+      req.user._id
+    );
     if (!updatedContact) {
       return res.status(404).json({ message: "Not found" });
     }
@@ -96,21 +85,24 @@ router.put("/:contactId", async (req, res, next) => {
   }
 });
 
-// @ PATCH /api/contacts/:contactId/favorite
-router.patch("/:contactId/favorite", async (req, res, next) => {
+// PATCH /api/contacts/:contactId/favorite
+router.patch("/:contactId/favorite", auth, async (req, res, next) => {
   try {
-    const { favorite } = req.body;
-    if (favorite === undefined) {
+    if (req.body.favorite === undefined) {
       return res.status(400).json({ message: "missing field favorite" });
     }
 
-    const updatedContact = await updateContact(req.params.contactId, {
-      favorite,
-    });
+    const updatedContact = await updateStatusContact(
+      req.params.contactId,
+      req.body,
+      req.user._id
+    );
+
     if (!updatedContact) {
       return res.status(404).json({ message: "Not found" });
     }
-    res.json(updatedContact);
+
+    res.status(200).json(updatedContact);
   } catch (error) {
     next(error);
   }

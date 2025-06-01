@@ -1,5 +1,3 @@
-// This file defines a Mongoose schema and model for a contact in a MongoDB database.
-
 const mongoose = require("mongoose");
 const Schema = mongoose.Schema;
 
@@ -18,6 +16,10 @@ const contactSchema = new Schema(
     favorite: {
       type: Boolean,
       default: false,
+    },
+    owner: {
+      type: Schema.Types.ObjectId,
+      ref: "user",
     },
   },
   { versionKey: false, timestamps: true }
